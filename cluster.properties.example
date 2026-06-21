@@ -1,0 +1,19 @@
+# Configuración del clúster de trackers (req. 2.1 — topología multinodo).
+#
+# Copia este archivo como "cluster.properties" en la raíz del proyecto y
+# ajústalo en CADA nodo: lo único que cambia entre nodos es "nodo.id".
+# La lista "nodos" debe ser idéntica en los tres y contener la membresía
+# completa, incluido el propio nodo, en formato:  id@host:puerto
+#
+# Igual que tracker.properties, este archivo queda fuera del repositorio:
+# cada integrante configura su entorno (localhost o IPs reales de la LAN).
+#
+# --- Ejemplo para pruebas en localhost (3 JVMs) ---
+# Nodo 1 -> nodo.id=1   Nodo 2 -> nodo.id=2   Nodo 3 -> nodo.id=3
+
+nodo.id=1
+nodos=1@127.0.0.1:6969,2@127.0.0.1:6970,3@127.0.0.1:6971
+
+# --- Ejemplo para una LAN real (descomenta y ajusta las IPv4) ---
+# nodo.id=1
+# nodos=1@192.168.1.10:6969,2@192.168.1.11:6969,3@192.168.1.12:6969

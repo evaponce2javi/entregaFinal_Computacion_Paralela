@@ -1,0 +1,11 @@
+# Configuración del cliente para alcanzar el tracker.
+#
+# Para el Final (clúster con failover) usa tracker.hosts con la lista de nodos:
+tracker.hosts=127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003
+
+# Alternativa de un solo tracker (modo Parcial); se usa solo si no hay tracker.hosts:
+# tracker.host=127.0.0.1
+# tracker.port=6969
+#
+# También puede fijarse por variable de entorno:
+#   TRACKER_HOSTS="127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003"
