@@ -1,243 +1,234 @@
-# Cómo ejecutar el Proyecto
+# uTorrent ICI-4344 — Sistema Distribuido P2P para Distribución de Archivos
 
-## Paso solo 1 vez:
+Proyecto Final del curso **ICI-4344 Computación Paralela y Distribuida** (PUCV).
 
-### Paso 0 — Verificar que Java está instalado.
-En cualquier terminal, ejecuta:
-```
-java -version
-javac -versión
-```
+El sistema evoluciona un cliente BitTorrent cliente-servidor hacia una arquitectura
+**genuinamente distribuida**: un **clúster de tres o más nodos de directorio** (trackers
+replicados) que se coordinan **sin reloj físico común** y siguen dando servicio aunque
+caiga cualquiera de sus nodos.
 
-Necesitas JDK 11 o superior. Si solo aparece java -version pero no javac, tienes solo el JRE; instala el JDK desde adoptium.net o usa sudo apt install default-jdk en Linux.
-Paso 1 — Crear la estructura de carpetas y archivos
-Ubícate en la carpeta donde quieras tener el proyecto (por ejemplo ~/proyectos/utorrent) y crea las carpetas:
+Mecanismos distribuidos implementados:
 
-**Windows PowerShell:**
-```
-New-Item -ItemType Directory -Force -Path src\utorrent\app, src\utorrent\p2p, src\utorrent\tracker, src\utorrent\modelos, src\utorrent\utils, src\utorrent\protocolo, out, archivos-a-compartir, descargas
-```
-**Linux/Mac:**
-
-```
-mkdir -p src/utorrent/{app,p2p,tracker,modelos,utils,protocolo}
-mkdir -p out
-mkdir -p archivos-a-compartir
-mkdir -p descargas
-```
-
-
-### Configuración del tracker
-
-Antes de ejecutar el cliente, crea un archivo `tracker.properties` en el directorio raíz del proyecto con la IP y puerto de la máquina que corre el tracker:
-
-```properties
-tracker.host=192.168.1.10
-tracker.port=6969
-```
-
-Este archivo está excluido del repositorio (ver `.gitignore`) para que cada integrante configure su propio entorno. Como referencia, usa el archivo `tracker.properties.example` incluido en el proyecto. Si `tracker.properties` no existe, el cliente pedirá los datos por consola al momento de ejecutarse.
-
-
-### Paso 2 — Compilar todo el proyecto
-Desde la raíz del proyecto (la carpeta que contiene src/ y out/):
-
-**Windows PowerShell:**
-```
-javac -d out (Get-ChildItem -Recurse -Filter *.java -Path src | ForEach-Object { $_.FullName })
-```
-**Linux/Mac:**
-```
-javac -d out $(find src -name "*.java")
-```
-**Windows CMD:**
-```
-dir /s /b src\*.java > sources.txt
-javac -d out @sources.txt
-```
-
-
-Si todo está bien, no debe imprimir nada (o solo un par de warnings sobre serial, que son inofensivos). Si imprime errores, revisa que cada archivo tenga el package correcto y que esté en su carpeta correspondiente.
-
-## Ejecución del sistema
-Ahora abres 3 terminales separadas, todas ubicadas en la raíz del proyecto. El orden importa: tracker primero, después seeder, finalmente leecher. También puede ser probado en distintos computadores: Para ello hay que verificar que en configuraciones de Wi-Fi el tipo de Red sea Privada. Para ver la IP, hay que abrir una terminal cmd y escribir *ipconfig*, y seleccionar la IPv4.
-
-### Terminal 1 — Servidor Tracker
-```
-java -cp out utorrent.tracker.ServidorTracker
-```
-
-El programa pedirá parámetros. Responde así (presiona ENTER después de cada uno):
-
-```
-=== Servidor Tracker BitTorrent ===
-Puerto de escucha (sugerido 6969): 6969
-Máximo de peers por IP (sugerido 3): 10
-Tamaño del pool de hilos (sugerido 32): 32
-[Tracker] Escuchando en puerto 6969 (maxParesPorIp=3)
-```
-
-**Sobre los parámetros:**
-
-- Puerto 6969 es el estándar de los trackers BitTorrent.
-- Máximo de peers por IP = 10: lo subo de 3 a 10 porque al hacer pruebas en localhost todos los peers comparten la misma IP (127.0.0.1) y se acabaría el rate limit anti-Sybil rápidamente. En una red real con IPs distintas, usa 3.
-- Pool de 32 hilos: suficiente para decenas de peers concurrentes.
-
-Esta terminal queda bloqueada con el tracker corriendo. No la cierres mientras hagas pruebas.
-
-### Terminal 2 — Usuario 1 (Seeder)
-
-#### Preparar un archivo de prueba para compartir
-Abre una segunda terminal en la misma carpeta del proyecto.
-Si no tienes un archivo listo para compartir en tu carpeta, crea un archivo cualquiera de menos de 50 MB (recuerda el límite del enunciado). Por ejemplo:
-
-**Windows PowerShell:**
-```
-# archivo de 2 MB con datos aleatorios
-$datos = New-Object byte[] 2097152
-(New-Object Random).NextBytes($datos)
-[IO.File]::WriteAllBytes("archivos-a-compartir\video.mp4", $datos)
-```
-
-**Para usuarios de Linux/Mac:**
-```
-# archivo de 2 MB con datos aleatorios
-dd if=/dev/urandom of=archivos-a-compartir/video.mp4 bs=1024 count=2048
-```
-
-Ejecuta el siguiente comando para correr la aplicacion del usuario:
-
-```
-java -cp out utorrent.app.AplicacionCliente
-```
-
-El programa pedirá los datos de configuración. Responde así:
-
-```
-=========================================
-   uTorrent académico — Cliente P2P
-=========================================
-Puerto local de escucha P2P (ej. 6881): 6881
-Mi peerId: -UT0001-XxXxXxXxXxXx
-
-Selecciona una opción:
-  1. Compartir archivo (Seeder)
-  2. Descargar archivo (Leecher)
-Opción: 1
-Ruta del archivo a compartir: archivos-a-compartir/video.mp4
-```
-En "Ruta del archivo a compartir" deberás ingresar el archivo que tienes a disposición o creaste (ejemplo: libro.pdf).
-
-Lo que debería pasar a continuación:
-```
-[Seeder] Hasheando video.mp4 (2097152 bytes en piezas de 262144 bytes)...
-[Seeder] infoHash = 4a8c1f9b3e2d...
-[Seeder] piezas   = 8
-[ServidorPar] Escuchando peers entrantes en puerto 6881
-[Seeder] Compartiendo. Presiona ENTER para detener...
-Y en la Terminal 1 (tracker) verás:
-[Tracker] iniciado     peer=-UT0001- ip=127.0.0.1 pares_swarm=1
-[Tracker] metadatos publicados archivo=video.mp4 ip=127.0.0.1
-```
-El seeder queda esperando. **No presiones ENTER aún**: si lo haces, el seeder se detiene. Déjalo así para que pueda servir al leecher.
-
-**Notas sobre los parámetros:**
-
-- *Si te equivocas con la ruta del archivo, el programa avisa y termina; vuelves a ejecutarlo.**
-
-### Terminal 3 — Usuario 2 (Leecher)
-Abre una tercera terminal en la misma carpeta y ejecuta:
-
-```
-java -cp out utorrent.app.AplicacionCliente
-```
-
-Responde así:
-
-```
-Puerto local de escucha P2P (ej. 6881): 6882
-Mi peerId: -UT0001-YyYyYyYyYyYy
-
-Selecciona una opción:
-  1. Compartir archivo (Seeder)
-  2. Descargar archivo (Leecher)
-Opción: 2
-Nombre del archivo a descargar (ej. video.mp4): video.mp4
-Carpeta de destino para la descarga: descargas
-```
-
-Nota el cambio: puerto local **6882** (no 6881, que ya lo está usando el seeder).
-
-Lo que verás:
-```
-[Leecher] Consultando al tracker por 'video.mp4'...
-[Leecher] Archivo encontrado: 2097152 bytes en 8 piezas de 262144 bytes
-[Leecher] Espacio reservado en descargas/video.mp4
-[ServidorPar] Escuchando peers entrantes en puerto 6882
-[SesionTorrent] Conectando a 1 peer(s)...
-[Leecher] Descarga en curso. Espera mientras se completan las piezas...
-[SesionPar] Handshake OK con -UT0001-
-[SesionPar] -UT0001- tiene 8/8 piezas
-[SesionPar] ✓ Pieza 3/8 verificada (1/8 total)
-[SesionPar] ✓ Pieza 1/8 verificada (2/8 total)
-[SesionPar] ✓ Pieza 7/8 verificada (3/8 total)
-...
-[Leecher] Progreso: 8/8 piezas (100.0%)
-[Leecher] ✓ Descarga completa: descargas/video.mp4
-```
-Las piezas se descargan en **orden no secuencial** gracias a la selección aleatoria del GestorPiezas — esto es lo que demuestra el algoritmo del enunciado.
-
-### Verificar que la descarga es correcta
-Abre una cuarta terminal (o usa cualquiera de las anteriores tras detener su programa) y compara los hashes:
-
-**Windows PowerShell:**
-```
-Get-FileHash archivos-a-compartir/video.mp4 -Algorithm SHA1
-Get-FileHash descargas/video.mp4 -Algorithm SHA1
-```
-
-**Linux/Mac:**
-```
-sha1sum archivos-a-compartir/video.mp4 descargas/video.mp4
-```
-
-Ambos hashes deben ser idénticos. Si lo son, has completado la prueba: el archivo se transfirió bit a bit por el protocolo P2P. Otra manera de verificar que el archivo se descargó con éxito es ingresando manualmente a la carpeta "descargas" desde el Explorador de Archivos y hacer clic en el que se acaba de descargar,
-
+- **Topología multinodo** (≥3 nodos, arquitectura multiservidor con membresía).
+- **Reloj lógico de Lamport** para el ordenamiento causal de eventos.
+- **Exclusión mutua distribuida** con **Ricart-Agrawala** (protege la escritura del directorio).
+- **Elección de coordinador** con el **algoritmo del abusón (Bully)**.
+- **Tolerancia a fallos**: detección por latidos (crash/omisión) y recuperación por
+  reelección y recálculo de quórum, sin interrupción del servicio.
+- **Generador de carga** con métricas (throughput, latencia media/p95, tasa de error) y
+  falla inducida del coordinador.
 
 ---
-Nota: Puedes probar más de 3 terminales/dispositivos tanto como seeder como leecher.
 
-**Probar tolerancia a fallos: matar el tracker durante la descarga.**
+## 1. Requisitos
 
-Mientras un leecher está descargando, presiona Ctrl+C en la Terminal 1 (tracker). El leecher seguirá descargando porque ya tiene la conexión P2P abierta con el seeder; solo fallarán los announce periódicos (verás los Backoff exponencial 5s/15s/30s en el log).
+- **JDK 17 o superior** (`javac` y `java`). Verifícalo con:
 
-**Probar tolerancia a fallos: matar el seeder durante la descarga**
+  ```
+  java -version
+  javac -version
+  ```
 
-Mientras un leecher está descargando, presiona Ctrl+C en la Terminal 2 (seeder). El leecher detectará la desconexión:
+  Si aparece `java` pero no `javac`, tienes solo el JRE: instala el JDK desde
+  [adoptium.net](https://adoptium.net) o, en Linux, `sudo apt install openjdk-17-jdk`.
+
+- No se requieren librerías externas: el proyecto usa solo la biblioteca estándar de Java.
+
+---
+
+## 2. Estructura del proyecto
+
 ```
-[SesionPar] Peer -UT0001- desconectado: EOF
+src/utorrent/
+├── app/         Punto de entrada del cliente P2P y del generador de carga
+├── cluster/     Capa de coordinación distribuida (Lamport, Ricart-Agrawala, Bully,
+│                detector de fallos, réplica, membresía, registro de eventos)
+├── tracker/     Servidor de directorio (clúster), cliente con failover, registro de pares
+├── p2p/         Plano de datos entre pares (transferencia, piezas, choke, ensamblado)
+├── protocolo/   Mensajes del protocolo entre pares (handshake, bitfield, request, piece…)
+├── modelos/     Estructuras de datos (metadatos, info de par, solicitudes/respuestas)
+└── utils/       Hash SHA-1, configuración de red, lectura/escritura de bloques
 ```
-Y la pieza que estaba descargando se re-encolará automáticamente para que la pueda intentar otro peer.
 
-### Errores comunes y cómo resolverlos
+Archivos de configuración de ejemplo en la raíz: `cluster.properties.example` y
+`tracker.properties.example`. Cópialos sin el sufijo `.example` y ajústalos a tu entorno.
 
-**ClassNotFoundException: utorrent.app.AplicacionCliente**
-Estás ejecutando desde una carpeta incorrecta. Vuelve a la raíz del proyecto (la que contiene src/ y out/) antes de ejecutar java -cp out ....
+---
 
-**Address already in use**
-El puerto que pediste ya lo está usando otro programa (o un Java zombi de una prueba anterior). Cambia el puerto o ejecuta pkill -9 java (Linux/Mac) o cierra todas las terminales y vuelve a empezar.
+## 3. Compilación
 
-**El tracker dice Rate limit excedido para IP 127.0.0.1**
-Estás haciendo demasiadas pruebas seguidas en localhost y el contador anti-Sybil llegó al límite. Espera 60 segundos a que se reinicie la ventana, o sube el Máximo de peers por IP al iniciar el tracker.
+Desde la **carpeta raíz** del proyecto (la que contiene `src/`). El flag `-encoding UTF-8`
+es necesario porque el código incluye comentarios con tildes.
 
-**El leecher dice El tracker no conoce el archivo solicitado**
-Estás pidiendo un nombre que ningún seeder ha publicado. Verifica que el seeder haya completado el metadatos publicados antes de iniciar el leecher.
+**Linux / macOS:**
 
-**El handshake falla con infoHash distinto al esperado**
-Esto pasa si dos seeders distintos comparten archivos con el mismo nombre pero contenido diferente. El leecher recibe los metadatos del primero pero conecta al segundo. Solución: limpia el tracker (reinícialo) y vuelve a publicar.
+```bash
+javac -encoding UTF-8 -d out $(find src -name "*.java")
+```
 
-## Como correrlo en VS Code
-1. Abrir el proyecto en su carpeta Raiz.
-2. Y seguir los pasos comentados.
+**Windows PowerShell:**
 
-¡Cuidado con no seleccionar la carpeta inicial correcta una vez descomprimido el .zip!
+```powershell
+javac -encoding UTF-8 -d out (Get-ChildItem -Recurse -Filter *.java -Path src | ForEach-Object { $_.FullName })
+```
+
+**Windows CMD:**
+
+```cmd
+dir /s /b src\*.java > sources.txt
+javac -encoding UTF-8 -d out @sources.txt
+```
+
+Si todo está bien, compila **66 clases** en `out/` y no imprime errores.
+
+---
+
+## 4. Configuración del clúster
+
+Cada nodo necesita un archivo **`cluster.properties`** en su carpeta de ejecución. La lista
+`nodos` debe ser **idéntica en los tres** y contener la membresía completa en formato
+`id@host:puerto`; lo único que cambia entre nodos es `nodo.id`.
+
+`cluster.properties` del **nodo 1** (los nodos 2 y 3 son iguales cambiando solo `nodo.id`):
+
+```properties
+nodo.id=1
+nodos=1@127.0.0.1:7001,2@127.0.0.1:7002,3@127.0.0.1:7003
+```
+
+Para un despliegue en **red de área local real** (recomendado para la demo), usa las IPv4
+de cada máquina en lugar de `127.0.0.1`:
+
+```properties
+nodo.id=1
+nodos=1@192.168.1.10:7001,2@192.168.1.11:7001,3@192.168.1.12:7001
+```
+
+El **coordinador inicial** es, por convención, el nodo de mayor `id` (el nodo 3).
+
+---
+
+## 5. Ejecución
+
+### 5.1. Levantar el clúster de tres nodos
+
+Crea una carpeta por nodo (`nodo1`, `nodo2`, `nodo3`), pon en cada una su
+`cluster.properties`, y levanta cada tracker en una **terminal independiente**. Al arrancar,
+cada tracker pide por consola el **máximo de peers por IP** y el **tamaño del pool de hilos**.
+
+**Linux / macOS** (desde la carpeta de cada nodo):
+
+```bash
+java -cp ../out utorrent.tracker.ServidorTracker
+```
+
+**Windows PowerShell:**
+
+```powershell
+java -cp ..\out utorrent.tracker.ServidorTracker
+```
+
+Los tres nodos se descubren por la membresía, intercambian latidos y acuerdan al nodo 3
+como coordinador. Cada nodo escribe su bitácora en `logs/eventos-nodoN.csv` y `.log`.
+
+### 5.2. Demo de transferencia P2P (función F2)
+
+Con el clúster en marcha, abre dos terminales más para un **sembrador (seeder)** y una
+**sanguijuela (leecher)**. Indica los nodos del clúster con la variable `TRACKER_HOSTS`
+(o un archivo `tracker.properties` con `tracker.hosts=...`).
+
+**Sembrador** (publica un archivo y queda sirviéndolo):
+
+```bash
+TRACKER_HOSTS="127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003" \
+  java -cp out utorrent.app.AplicacionCliente
+# Menú → opción 1 (Compartir). Puerto de escucha sugerido: 6881.
+```
+
+**Sanguijuela** (descubre el archivo por el directorio y lo descarga):
+
+```bash
+TRACKER_HOSTS="127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003" \
+  java -cp out utorrent.app.AplicacionCliente
+# Menú → opción 2 (Descargar). Puerto de escucha sugerido: 6882.
+```
+
+La descarga se verifica pieza a pieza con SHA-1. Para confirmar que el archivo llegó
+íntegro, compara los hashes del original y del descargado:
+
+```bash
+sha1sum archivos-a-compartir/<archivo>  descargas/<archivo>   # Linux/macOS
+Get-FileHash descargas\<archivo> -Algorithm SHA1              # PowerShell
+```
+
+### 5.3. Prueba de carga con falla inducida (requisitos 3.1–3.4)
+
+Esta es la prueba central. Conviene **acelerar el detector** y **elevar el umbral
+anti-Sybil** (si no, el control de admisión rechazaría el tráfico masivo desde una misma IP).
+
+**1) Levanta los tres nodos** con detector acelerado para una recuperación ágil. Cuando
+pidan el máximo de peers por IP, responde un valor alto (p. ej. `100000000`) y un pool de `64`:
+
+```bash
+java -Ddetector.intervalo=500 -Ddetector.sospecha=1200 -Ddetector.caida=2000 \
+     -Dbully.timeoutOk=500 -Dbully.timeoutCoord=1000 \
+     -cp ../out utorrent.tracker.ServidorTracker
+```
+
+**2) Lanza el generador de carga** (50 clientes, 60 s, con la falla programada en t = 30 s):
+
+```bash
+TRACKER_HOSTS="127.0.0.1:7001,127.0.0.1:7002,127.0.0.1:7003" \
+  java -Dcarga.hilos=50 -Dcarga.duracion=60 -Dcarga.fallaEn=30 \
+       -cp out utorrent.app.GeneradorCarga
+```
+
+**3) En el segundo 30**, en plena carga, **derriba el proceso del coordinador** (el nodo de
+mayor id, el nodo 3). Cierra esa terminal con `Ctrl+C`, o:
+
+```bash
+# Linux/macOS:  matar abruptamente el proceso del coordinador
+kill -9 <PID_del_nodo3>
+# Windows PowerShell:
+Stop-Process -Id <PID_del_nodo3> -Force
+```
+
+Los nodos supervivientes detectan la ausencia de latidos, declaran la caída, recalculan el
+quórum de la exclusión mutua y eligen un nuevo coordinador, **sin dejar de atender** a los
+clientes. Al terminar, el generador imprime las métricas globales y su desglose **antes /
+después** de la falla.
+
+### 5.4. Recolección de la evidencia
+
+Tras la corrida quedan en `logs/`:
+
+- `eventos-nodo1.csv`, `eventos-nodo2.csv`, `eventos-nodo3.csv` — eventos con marca de
+  Lamport (`ts_lamport;ts_epoch_ms;nodo;tipo;detalle`): mensajes de mutex, eventos de
+  elección, detección de la falla y líneas `METRICAS` con los recuentos de coordinación.
+- `carga.csv` — registro por petición (`ts_ms;latencia_ms;exito`) para construir la serie
+  temporal de latencia y el gráfico del impacto de la falla.
+
+Fusionando los tres `eventos-nodoN.csv` y ordenándolos por `ts_lamport` se reconstruye el
+orden causal total y se verifica que ningún par de nodos estuvo simultáneamente dentro de la
+sección crítica.
+
+---
+
+## 6. Modo de nodo único (compatibilidad con el Parcial)
+
+Si **no** existe `cluster.properties`, el tracker arranca en modo de nodo único y pide el
+puerto por consola; el cliente puede usar entonces un único `tracker.properties` con
+`tracker.host` / `tracker.port`. Útil para probar solo la transferencia P2P sin clúster.
+
+---
+
+## 7. Solución de problemas
+
+- **`unmappable character` al compilar:** falta `-encoding UTF-8` en el comando de `javac`.
+- **El cliente o el generador no conectan:** revisa que los puertos de `cluster.properties`
+  (donde escuchan los nodos) coincidan con los de `TRACKER_HOSTS` / `tracker.hosts` (a dónde
+  apunta el cliente). Por defecto, ambos son **7001, 7002, 7003**.
+- **El generador reporta errores de admisión:** el control anti-Sybil está rechazando el
+  tráfico; sube el "máximo de peers por IP" al arrancar los nodos.
+- **No se dispara la elección al matar el coordinador:** asegúrate de matar el **proceso del
+  nodo de mayor id** (el coordinador), no otro nodo.
