@@ -232,3 +232,25 @@ puerto por consola; el cliente puede usar entonces un único `tracker.properties
   tráfico; sube el "máximo de peers por IP" al arrancar los nodos.
 - **No se dispara la elección al matar el coordinador:** asegúrate de matar el **proceso del
   nodo de mayor id** (el coordinador), no otro nodo.
+
+## Anexo C — Ejecución real de la prueba de tráfico con falla inducida
+
+Esta corrida se ejecutó sobre Windows + PowerShell con tres nodos de directorio
+(`nodo1`/`nodo2`/`nodo3`) en `127.0.0.1:7001-7003`, cada uno en su propia JVM con su
+`cluster.properties`, y los detectores acelerados para la demostración
+(`-Ddetector.intervalo=500 -Ddetector.sospecha=1200 -Ddetector.caida=2000`,
+`-Dbully.timeoutOk=500 -Dbully.timeoutCoord=1000`). El máximo de peers por IP se elevó a
+100.000.000 porque los 50 clientes salen todos de `127.0.0.1` y el control anti-Sybil,
+con su valor por defecto (3), los rechazaría.
+
+### Procedimiento
+1. Arranque de los tres trackers. El coordinador inicial determinista es el nodo 3 (mayor id).
+2. Generador de carga: 50 clientes concurrentes durante 60 s
+   (`-Dcarga.hilos=50 -Dcarga.duracion=60 -Dcarga.fallaEn=30`).
+3. En t ≈ 30 s se derribó el proceso del coordinador (nodo 3) con `Stop-Process -Force`
+   (caída abrupta, sin cierre ordenado).
+
+### Resultado de la falla inducida (evidencia en `logs/`)
+A los ~2,2 s sin latidos, los nodos supervivientes marcaron CAIDO al nodo 3, lo
+descontaron del quórum de la exclusión mutua, dispararon la elección Bully y **el nodo 2
+quedó como nuevo coordinador**, sin interrumpir el servicio:
